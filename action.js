@@ -115,14 +115,28 @@ async function latestTagForBranch(allTags, branch) {
     })
     .then((commits) => {
       core.info(`Fetched ${commits.length} commits`)
-      let latestTag
 
+      // Find all tags that match commits on this branch
+      const matchingTags = []
       for (const commit of commits) {
-        latestTag = allTags.find((tag) => tag.object.sha === commit.sha)
-        if (latestTag) break
+        const tag = allTags.find((tag) => tag.object.sha === commit.sha)
+        if (tag) {
+          matchingTags.push(tag)
+        }
       }
 
-      return latestTag
+      if (matchingTags.length === 0) {
+        return null
+      }
+
+      // Return the tag with the highest version number
+      return matchingTags.reduce((highest, tag) => {
+        const highestSem = semanticVersion(highest.ref)
+        const tagSem = semanticVersion(tag.ref)
+        if (!highestSem) return tag
+        if (!tagSem) return highest
+        return semver.compare(tagSem, highestSem) > 0 ? tag : highest
+      })
     })
     .catch((e) => {
       core.setFailed(`Failed to fetch commits for branch '${branch}' : ${e}`)
